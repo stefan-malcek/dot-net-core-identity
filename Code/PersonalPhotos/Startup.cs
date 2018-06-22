@@ -1,7 +1,12 @@
-﻿using Core.Interfaces;
+﻿using System;
+using System.Reflection;
+using Core.Interfaces;
 using Core.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PersonalPhotos.Filters;
@@ -27,6 +32,42 @@ namespace PersonalPhotos
             services.AddScoped<IPhotoMetaData, SqlPhotoMetaData>();
             services.AddScoped<IFileStorage, LocalFileStorage>();
             services.AddScoped<LoginAttribute>();
+
+            var connectionString = Configuration.GetConnectionString("Default");
+            var currentAssemblyName = Assembly.GetExecutingAssembly().GetName().Name;
+            services.AddDbContext<IdentityDbContext>(option =>
+            {
+                option.UseSqlServer(connectionString, obj => obj.MigrationsAssembly(currentAssemblyName));
+            });
+
+            services.AddIdentity<IdentityUser, IdentityRole>(option =>
+            {
+                option.Password = new PasswordOptions
+                {
+                    RequireDigit = false,
+                    RequiredLength = 3,
+                    RequiredUniqueChars = 3,
+                    RequireLowercase = false
+                };
+
+                option.User = new UserOptions
+                {
+                    RequireUniqueEmail = true
+                };
+
+                option.SignIn = new SignInOptions
+                {
+                    RequireConfirmedEmail = false,
+                    RequireConfirmedPhoneNumber = false
+                };
+
+                option.Lockout = new LockoutOptions
+                {
+                    AllowedForNewUsers = false,
+                    DefaultLockoutTimeSpan = new TimeSpan(0, 15, 0),
+                    MaxFailedAccessAttempts = 3
+                };
+            }).AddEntityFrameworkStores<IdentityDbContext>().AddDefaultTokenProviders();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
