@@ -47,7 +47,8 @@ namespace PersonalPhotos
                     RequireDigit = false,
                     RequiredLength = 3,
                     RequiredUniqueChars = 3,
-                    RequireLowercase = false
+                    RequireLowercase = false,
+                    RequireNonAlphanumeric = false
                 };
 
                 option.User = new UserOptions
@@ -68,6 +69,8 @@ namespace PersonalPhotos
                     MaxFailedAccessAttempts = 3
                 };
             }).AddEntityFrameworkStores<IdentityDbContext>().AddDefaultTokenProviders();
+
+            services.ConfigureApplicationCookie(option => option.LoginPath = "/Logins/index");
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -85,6 +88,7 @@ namespace PersonalPhotos
 
             app.UseStaticFiles();
             app.UseSession();
+            app.UseAuthentication();
             app.UseMvc(routes =>
             {
                 routes.MapRoute(

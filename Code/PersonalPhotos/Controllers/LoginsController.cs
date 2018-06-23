@@ -1,6 +1,5 @@
 ﻿using System.Threading.Tasks;
-using Core.Interfaces;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using PersonalPhotos.Models;
 
@@ -8,18 +7,19 @@ namespace PersonalPhotos.Controllers
 {
     public class LoginsController : Controller
     {
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly ILogins _loginService;
+        private readonly UserManager<IdentityUser> _userManager;
+        private readonly SignInManager<IdentityUser> _signInManager;
 
-        public LoginsController(ILogins loginService, IHttpContextAccessor httpContextAccessor)
+        public LoginsController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager)
         {
-            _loginService = loginService;
-            _httpContextAccessor = httpContextAccessor;
+            _userManager = userManager;
+            _signInManager = signInManager;
         }
 
+        [HttpGet]
         public IActionResult Index(string returnUrl = null)
         {
-            var model = new LoginViewModel { ReturnUrl = returnUrl};
+            var model = new LoginViewModel { ReturnUrl = returnUrl };
             return View("Login", model);
         }
 
@@ -32,36 +32,22 @@ namespace PersonalPhotos.Controllers
                 return View("Login", model);
             }
 
-            var user = await _loginService.GetUser(model.Email);
-            if (user != null)
+            var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, false);
+            if (!result.Succeeded)
             {
-                if (user.Password == model.Password)
-                {
-                    //ToDo: redirect to home page
-                    _httpContextAccessor.HttpContext.Session.SetString("User", model.Email);
-                }
-                else
-                {
-                    ModelState.AddModelError("", "Invalid password");
-                    return View("Login", model);
-                }
-            }
-            else
-            {
-                ModelState.AddModelError("", "User was not found");
-                return View("Login", model);
+                ModelState.AddModelError(string.Empty, "Username or password is incorrect.");
+                return View();
             }
 
             if (!string.IsNullOrEmpty(model.ReturnUrl))
             {
                 return Redirect(model.ReturnUrl);
             }
-            else
-            {
-                return RedirectToAction("Display", "Photos");
-            }
+
+            return RedirectToAction("Display", "Photos");
         }
 
+        [HttpGet]
         public IActionResult Create()
         {
             return View("Create");
@@ -72,20 +58,28 @@ namespace PersonalPhotos.Controllers
         {
             if (!ModelState.IsValid)
             {
-                ModelState.AddModelError("", "Invalid user details");
+                ModelState.AddModelError(string.Empty, "Invalid user details");
                 return View(model);
             }
 
-            var existingUser = await _loginService.GetUser(model.Email);
-            if (existingUser != null)
+            var user = new IdentityUser
             {
-                ModelState.AddModelError("", "This email adress is already registered");
-                return View(model);
+                UserName = model.Email,
+                Email = model.Email
+            };
+
+            var result = await _userManager.CreateAsync(user, model.Password);
+            if (result.Succeeded)
+            {
+                return RedirectToAction("Index", "Logins");
             }
 
-            await _loginService.CreateUser(model.Email, model.Password);
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, $"{error.Code}:{error.Description}");
+            }
 
-            return RedirectToAction("Index", "Logins");
+            return View();
         }
     }
 }
