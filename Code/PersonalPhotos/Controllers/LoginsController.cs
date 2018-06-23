@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -39,6 +40,13 @@ namespace PersonalPhotos.Controllers
             {
                 ModelState.AddModelError("", "Invalid login detils");
                 return View("Login", model);
+            }
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null || !user.EmailConfirmed)
+            {
+                ModelState.AddModelError(string.Empty, "User not found or email is not confirmed.");
+                return View();
             }
 
             var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, false);
@@ -99,7 +107,7 @@ namespace PersonalPhotos.Controllers
                 //await _userManager.AddToRoleAsync(user, "Editor");
 
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                var url = Url.Action("Confirmation", "Logins", new { id = user.Id, token });
+                var url = Url.Action("Confirmation", "Logins", new { id = user.Id, token }, HttpContext.Request.Scheme);
                 var emailBody = $"Please confirm your email by clicking on the link below</br>{url}";
                 await _email.Send(model.Email, emailBody);
 
@@ -122,11 +130,67 @@ namespace PersonalPhotos.Controllers
 
             if (confirm.Succeeded)
             {
-                return RedirectToAction("Login");
+                return RedirectToAction("Index");
             }
 
             ViewBag["Error"] = "Error with validating the email address";
             return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ResetPassword()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var user = await _userManager.FindByEmailAsync(model.EmailAddress);
+                if (user != null && user.EmailConfirmed)
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    var url = Url.Action("ChangePassword", "Logins", new { id = user.Id, token },
+                        HttpContext.Request.Scheme);
+                    var emailBody = $"Click on the link to reset your password</br>{url}";
+                    await _email.Send(model.EmailAddress, emailBody);
+                }
+            }
+
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ChangePassword(string id, string token)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user != null)
+            {
+                var model = new ChangePasswordViewModel();
+                model.EmailAddress = user.Email;
+                model.Token = token;
+
+                return View(model);
+            }
+
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                ModelState.AddModelError(string.Empty, "Error in page!");
+                return View(model);
+            }
+
+            var user = await _userManager.FindByEmailAsync(model.EmailAddress);
+            var resetPasswordResult = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+
+            return RedirectToAction("Index", "Logins");
         }
     }
 }
