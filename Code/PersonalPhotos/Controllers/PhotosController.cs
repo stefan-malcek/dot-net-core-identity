@@ -8,7 +8,6 @@ using PersonalPhotos.Models;
 
 namespace PersonalPhotos.Controllers
 {
-    [Authorize]
     public class PhotosController : Controller
     {
         private readonly IFileStorage _fileStorage;
@@ -26,12 +25,14 @@ namespace PersonalPhotos.Controllers
         }
 
         [HttpGet]
+        [Authorize("EditorOver18Policy")]
         public IActionResult Upload()
         {
             return View();
         }
 
         [HttpPost]
+        [Authorize("EditorOver18Policy")]
         public async Task<IActionResult> Upload(PhotoUploadViewModel model)
         {
             if (ModelState.IsValid)
@@ -47,6 +48,7 @@ namespace PersonalPhotos.Controllers
         }
 
         [HttpGet]
+        [Authorize]
         public IActionResult Display()
         {
             var userName = User.Identity.Name;

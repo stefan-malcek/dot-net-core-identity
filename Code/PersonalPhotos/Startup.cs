@@ -71,6 +71,14 @@ namespace PersonalPhotos
             }).AddEntityFrameworkStores<IdentityDbContext>().AddDefaultTokenProviders();
 
             services.ConfigureApplicationCookie(option => option.LoginPath = "/Logins/index");
+            services.AddAuthorization(option =>
+            {
+                option.AddPolicy("EditorOver18Policy", policy =>
+                {
+                    policy.RequireClaim("Over18Claim")
+                        .RequireRole("Editor");
+                });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

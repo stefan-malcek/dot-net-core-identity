@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,11 +12,14 @@ namespace PersonalPhotos.Controllers
     {
         private readonly UserManager<IdentityUser> _userManager;
         private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
 
-        public LoginsController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager)
+        public LoginsController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager,
+            RoleManager<IdentityRole> roleManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _roleManager = roleManager;
         }
 
         [HttpGet]
@@ -39,6 +44,10 @@ namespace PersonalPhotos.Controllers
                 ModelState.AddModelError(string.Empty, "Username or password is incorrect.");
                 return View();
             }
+
+            var claims = new List<Claim> { new Claim("Over18Claim", "True") };
+            var claimIdentity = new ClaimsIdentity(claims);
+            User.AddIdentity(claimIdentity);
 
             if (!string.IsNullOrEmpty(model.ReturnUrl))
             {
@@ -70,6 +79,11 @@ namespace PersonalPhotos.Controllers
                 return View(model);
             }
 
+            if (!await _roleManager.RoleExistsAsync("Editor"))
+            {
+                await _roleManager.CreateAsync(new IdentityRole("Editor"));
+            }
+
             var user = new IdentityUser
             {
                 UserName = model.Email,
@@ -79,6 +93,7 @@ namespace PersonalPhotos.Controllers
             var result = await _userManager.CreateAsync(user, model.Password);
             if (result.Succeeded)
             {
+                await _userManager.AddToRoleAsync(user, "Editor");
                 return RedirectToAction("Index", "Logins");
             }
 
