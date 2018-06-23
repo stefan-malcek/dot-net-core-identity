@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using PersonalPhotos.Interfaces;
 using PersonalPhotos.Models;
 
 namespace PersonalPhotos.Controllers
@@ -13,13 +14,15 @@ namespace PersonalPhotos.Controllers
         private readonly UserManager<IdentityUser> _userManager;
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IEmail _email;
 
         public LoginsController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager,
-            RoleManager<IdentityRole> roleManager)
+            RoleManager<IdentityRole> roleManager, IEmail email)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _roleManager = roleManager;
+            _email = email;
         }
 
         [HttpGet]
@@ -93,7 +96,13 @@ namespace PersonalPhotos.Controllers
             var result = await _userManager.CreateAsync(user, model.Password);
             if (result.Succeeded)
             {
-                await _userManager.AddToRoleAsync(user, "Editor");
+                //await _userManager.AddToRoleAsync(user, "Editor");
+
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var url = Url.Action("Confirmation", "Logins", new { id = user.Id, token });
+                var emailBody = $"Please confirm your email by clicking on the link below</br>{url}";
+                await _email.Send(model.Email, emailBody);
+
                 return RedirectToAction("Index", "Logins");
             }
 
@@ -102,6 +111,21 @@ namespace PersonalPhotos.Controllers
                 ModelState.AddModelError(string.Empty, $"{error.Code}:{error.Description}");
             }
 
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Confirmation(string id, string token)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            var confirm = await _userManager.ConfirmEmailAsync(user, token);
+
+            if (confirm.Succeeded)
+            {
+                return RedirectToAction("Login");
+            }
+
+            ViewBag["Error"] = "Error with validating the email address";
             return View();
         }
     }

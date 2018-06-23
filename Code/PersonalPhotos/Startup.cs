@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PersonalPhotos.Filters;
+using PersonalPhotos.Interfaces;
+using PersonalPhotos.Strategies;
 
 namespace PersonalPhotos
 {
@@ -32,6 +34,7 @@ namespace PersonalPhotos
             services.AddScoped<IPhotoMetaData, SqlPhotoMetaData>();
             services.AddScoped<IFileStorage, LocalFileStorage>();
             services.AddScoped<LoginAttribute>();
+            services.AddSingleton<IEmail, SmtpEmail>();
 
             var connectionString = Configuration.GetConnectionString("Default");
             var currentAssemblyName = Assembly.GetExecutingAssembly().GetName().Name;
@@ -79,6 +82,8 @@ namespace PersonalPhotos
                         .RequireRole("Editor");
                 });
             });
+
+            services.Configure<EmailOptions>(Configuration.GetSection("Email"));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
