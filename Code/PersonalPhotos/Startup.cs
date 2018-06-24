@@ -86,6 +86,10 @@ namespace PersonalPhotos
             {
                 option.AppId = Configuration.GetSection("Facebook").GetValue<string>("AppId");
                 option.AppSecret = Configuration.GetSection("Facebook").GetValue<string>("AppSecret");
+            }).AddGoogle(option =>
+            {
+                option.ClientId = Configuration.GetSection("Google").GetValue<string>("ClientId");
+                option.ClientSecret = Configuration.GetSection("Google").GetValue<string>("ClientSecret");
             });
 
             services.Configure<EmailOptions>(Configuration.GetSection("Email"));
