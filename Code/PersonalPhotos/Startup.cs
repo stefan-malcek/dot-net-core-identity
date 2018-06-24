@@ -78,9 +78,14 @@ namespace PersonalPhotos
             {
                 option.AddPolicy("EditorOver18Policy", policy =>
                 {
-                    policy.RequireClaim("Over18Claim")
-                        .RequireRole("Editor");
+                    policy.RequireClaim("Over18Claim");
                 });
+            });
+
+            services.AddAuthentication().AddFacebook(option =>
+            {
+                option.AppId = Configuration.GetSection("Facebook").GetValue<string>("AppId");
+                option.AppSecret = Configuration.GetSection("Facebook").GetValue<string>("AppSecret");
             });
 
             services.Configure<EmailOptions>(Configuration.GetSection("Email"));
