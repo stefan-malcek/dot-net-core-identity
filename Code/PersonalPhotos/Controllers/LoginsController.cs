@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using PersonalPhotos.Interfaces;
 using PersonalPhotos.Models;
+using SignInResult = Microsoft.AspNetCore.Identity.SignInResult;
 
 namespace PersonalPhotos.Controllers
 {
@@ -52,6 +54,11 @@ namespace PersonalPhotos.Controllers
             var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, false);
             if (!result.Succeeded)
             {
+                if (result == SignInResult.TwoFactorRequired)
+                {
+                    return RedirectToAction("MfaLogin", "Logins");
+                }
+
                 ModelState.AddModelError(string.Empty, "Username or password is incorrect.");
                 return View();
             }
@@ -128,13 +135,14 @@ namespace PersonalPhotos.Controllers
             var user = await _userManager.FindByIdAsync(id);
             var confirm = await _userManager.ConfirmEmailAsync(user, token);
 
-            if (confirm.Succeeded)
+            if (!confirm.Succeeded)
             {
-                return RedirectToAction("Index");
+                ViewBag["Error"] = "Error with validating the email address";
+                return View();
             }
 
-            ViewBag["Error"] = "Error with validating the email address";
-            return View();
+            var is2FaEnabled = await _userManager.GetTwoFactorEnabledAsync(user);
+            return RedirectToAction(!is2FaEnabled ? "Setup2Fa" : "Index", "Logins");
         }
 
         [HttpGet]
@@ -191,6 +199,91 @@ namespace PersonalPhotos.Controllers
             var resetPasswordResult = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
 
             return RedirectToAction("Index", "Logins");
+        }
+
+        [Authorize]
+        public async Task<IActionResult> Setup2Fa()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user != null)
+            {
+                var authKey = await _userManager.GetAuthenticatorKeyAsync(user);
+                if (string.IsNullOrEmpty(authKey))
+                {
+                    await _userManager.ResetAuthenticatorKeyAsync(user);
+                    authKey = await _userManager.GetAuthenticatorKeyAsync(user);
+                }
+
+                var model = new MfaCreateViewModel
+                {
+                    AuthKey = FormatAuthKey(authKey)
+                };
+
+                return View(model);
+            }
+            return View();
+        }
+
+        [Authorize]
+        [HttpPost]
+        public async Task<IActionResult> Setup2Fa(MfaCreateViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            var isCodeCorrect = await _userManager.VerifyTwoFactorTokenAsync(user,
+                _userManager.Options.Tokens.AuthenticatorTokenProvider, model.Code);
+            if (!isCodeCorrect)
+            {
+                ModelState.AddModelError(string.Empty, "The code did not match the auth key!");
+                return View(model);
+            }
+
+            await _userManager.SetTwoFactorEnabledAsync(user, true);
+            return RedirectToAction("Index", "Logins");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> MfaLogin()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> MfaLogin(MfaLoginViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var result = await _signInManager.TwoFactorSignInAsync(_userManager.Options.Tokens.AuthenticatorTokenProvider,
+                 model.Code, true, true);// first true - cookie, second true - I do not have to use mfa login in this browser
+
+            if (!result.Succeeded)
+            {
+                ModelState.AddModelError(string.Empty, "Your code could not be validated. Try again.");
+                return View(model);
+            }
+
+            return RedirectToAction("Index", "Logins");
+        }
+
+        private string FormatAuthKey(string authKey)
+        {
+            const int chunckLength = 5;
+            var builder = new StringBuilder();
+            while (authKey.Length > 0)
+            {
+                var length = chunckLength > authKey.Length ? authKey.Length : chunckLength;
+                builder.Append(authKey.Substring(0, length) + " ");
+                authKey = authKey.Remove(0, length);
+            }
+
+            return builder.ToString();
         }
     }
 }

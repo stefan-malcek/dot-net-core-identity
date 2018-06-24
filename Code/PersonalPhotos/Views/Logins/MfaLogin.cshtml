@@ -1,0 +1,18 @@
+﻿@model MfaLoginViewModel
+@{
+    ViewData["Title"] = "Mfa Login";
+}
+
+<h2>MfaLogin</h2>
+<div class="container">
+    <div class="row">
+        <div class="col-md-10">
+            @Html.ValidationSummary()
+            <form method="post" asp-action="MfaLogin" asp-controller="Logins">
+                <label for="Code">Enter MFA Code:</label>
+                <input type="text" asp-for="Code" id="Code"/>
+                <input type="submit" value="Login with MFA" class="btn btn-primary"/>
+            </form>
+        </div>
+    </div>
+</div>
